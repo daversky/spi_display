@@ -13,8 +13,8 @@ static void display_cs_high(mp_display_obj_t *self) { CS_HIGH(self); }
 
 static void spi_write(mp_obj_t spi_obj, const uint8_t *data, size_t len) {
     mp_obj_t bytearray = mp_obj_new_bytearray_by_ref(len, (void *)data);
-    mp_obj_t args[2] = { spi_obj, bytearray };
-    mp_call_method_n_kw(1, 0, args, MP_OBJ_NULL, MP_QSTR_write);
+    mp_obj_t args[1] = { bytearray };
+    mp_call_method_n_kw(1, 0, args, &spi_obj, MP_OBJ_NULL, MP_QSTR_write);
 }
 
 void display_send_cmd(mp_display_obj_t *self, uint8_t cmd) {
@@ -238,23 +238,11 @@ static mp_obj_t display_reset(mp_obj_t self_in) {
 }
 static MP_DEFINE_CONST_FUN_OBJ_1(display_reset_obj, display_reset);
 
-// Define properties using new style (MP_PROPERTY_GETTER/GETSET)
-static const mp_obj_property_t display_buffer_prop = {
-    .base.type = &mp_type_property,
-    .proxy = { (mp_obj_t)&display_get_buffer_obj, MP_OBJ_NULL, MP_OBJ_NULL }
-};
-static const mp_obj_property_t display_width_prop = {
-    .base.type = &mp_type_property,
-    .proxy = { (mp_obj_t)&display_get_width_obj, MP_OBJ_NULL, MP_OBJ_NULL }
-};
-static const mp_obj_property_t display_height_prop = {
-    .base.type = &mp_type_property,
-    .proxy = { (mp_obj_t)&display_get_height_obj, MP_OBJ_NULL, MP_OBJ_NULL }
-};
-static const mp_obj_property_t display_rotation_prop = {
-    .base.type = &mp_type_property,
-    .proxy = { (mp_obj_t)&display_get_rotation_obj, (mp_obj_t)&display_set_rotation_obj, MP_OBJ_NULL }
-};
+// Properties
+MP_DEFINE_CONST_PROP_GET(display_buffer_prop, display_get_buffer_obj);
+MP_DEFINE_CONST_PROP_GET(display_width_prop, display_get_width_obj);
+MP_DEFINE_CONST_PROP_GET(display_height_prop, display_get_height_obj);
+MP_DEFINE_CONST_PROP_GETSET(display_rotation_prop, display_get_rotation_obj, display_set_rotation_obj);
 
 static const mp_rom_map_elem_t display_locals_dict_table[] = {
     { MP_ROM_QSTR(MP_QSTR___del__), MP_ROM_PTR(&display_del_obj) },
@@ -271,11 +259,10 @@ static const mp_rom_map_elem_t display_locals_dict_table[] = {
 };
 static MP_DEFINE_CONST_DICT(display_locals_dict, display_locals_dict_table);
 
-// Explicit type definition (no MP_DEFINE_CONST_OBJ_TYPE)
-const mp_obj_type_t mp_type_display = {
-    .base = { &mp_type_type },
-    .name = MP_QSTR_Display,
-    .flags = MP_TYPE_FLAG_NONE,
-    .make_new = display_make_new,
-    .locals_dict = (mp_obj_dict_t*)&display_locals_dict,
-};
+MP_DEFINE_CONST_OBJ_TYPE(
+    mp_type_display,
+    MP_QSTR_Display,
+    MP_TYPE_FLAG_NONE,
+    make_new = display_make_new,
+    locals_dict = &display_locals_dict
+);

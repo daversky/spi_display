@@ -73,11 +73,11 @@ static mp_obj_t st7735_make_new(const mp_obj_type_t *type, size_t n_args, size_t
 static const mp_rom_map_elem_t st7735_locals_dict_table[] = { };
 static MP_DEFINE_CONST_DICT(st7735_locals_dict, st7735_locals_dict_table);
 
-const mp_obj_type_t mp_type_st7735 = {
-    .base = { &mp_type_type },
-    .name = MP_QSTR_ST7735,
-    .flags = MP_TYPE_FLAG_NONE,
-    .make_new = st7735_make_new,
-    .locals_dict = (mp_obj_dict_t*)&st7735_locals_dict,
-    .parent = &mp_type_display,
-};
+MP_DEFINE_CONST_OBJ_TYPE(
+    mp_type_st7735,
+    MP_QSTR_ST7735,
+    MP_TYPE_FLAG_NONE,
+    make_new = st7735_make_new,
+    locals_dict = &st7735_locals_dict,
+    base = &mp_type_display
+);

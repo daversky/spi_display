@@ -2,6 +2,7 @@
 #include "py/mphal.h"
 #include "py/objarray.h"
 #include "extmod/virtpin.h"
+#include "extmod/modmachine.h"
 
 #define CS_LOW(self) if ((self)->cs != MP_OBJ_NULL) mp_hal_pin_write(mp_hal_get_pin_obj((self)->cs), 0)
 #define CS_HIGH(self) if ((self)->cs != MP_OBJ_NULL) mp_hal_pin_write(mp_hal_get_pin_obj((self)->cs), 1)
@@ -11,11 +12,26 @@
 static void display_cs_low(mp_display_obj_t *self) { CS_LOW(self); }
 static void display_cs_high(mp_display_obj_t *self) { CS_HIGH(self); }
 
-static void spi_write(mp_obj_t spi_obj, const uint8_t *data, size_t len) {
-    mp_obj_t bytearray = mp_obj_new_bytearray_by_ref(len, (void *)data);
-    mp_obj_t args[1] = { bytearray };
-    mp_call_method_n_kw(1, 0, args, &spi_obj, MP_OBJ_NULL, MP_QSTR_write);
+//static void spi_write(mp_obj_t spi_obj, const uint8_t *data, size_t len) {
+//    mp_obj_t bytearray = mp_obj_new_bytearray_by_ref(len, (void *)data);
+//    mp_obj_t args[1] = { bytearray };
+//    mp_call_method_n_kw(1, 0, args, &spi_obj, MP_OBJ_NULL, MP_QSTR_write);
+//}
+
+//static void spi_write(mp_obj_t spi_obj, const uint8_t *data, size_t len) {
+//    mp_obj_t dest[3];
+//    mp_load_method(spi_obj, MP_QSTR_write, dest);
+//    dest[2] = mp_obj_new_bytearray_by_ref(len, (void *)data);
+//    mp_call_method_n_kw(1, 0, dest);
+//}
+
+void spi_write(mp_obj_t spi_obj, const uint8_t *data, size_t len) {
+    mp_obj_base_t *s = (mp_obj_base_t *)MP_OBJ_TO_PTR(spi_obj);
+    mp_machine_spi_p_t *spi_p = (mp_machine_spi_p_t *)s->type->protocol;
+    // Прямой вызов драйвера SPI без участия интерпретатора Python
+    spi_p->transfer(s, len, data, NULL);
 }
+
 
 void display_send_cmd(mp_display_obj_t *self, uint8_t cmd) {
     display_cs_low(self);
@@ -143,25 +159,25 @@ static mp_obj_t display_get_buffer(mp_obj_t self_in) {
     mp_display_obj_t *self = MP_OBJ_TO_PTR(self_in);
     return self->buffer_obj;
 }
-static MP_DEFINE_CONST_FUN_OBJ_1(display_get_buffer_obj, display_get_buffer);
+//static MP_DEFINE_CONST_FUN_OBJ_1(display_get_buffer_obj, display_get_buffer);
 
 static mp_obj_t display_get_width(mp_obj_t self_in) {
     mp_display_obj_t *self = MP_OBJ_TO_PTR(self_in);
     return MP_OBJ_NEW_SMALL_INT(self->width);
 }
-static MP_DEFINE_CONST_FUN_OBJ_1(display_get_width_obj, display_get_width);
+//static MP_DEFINE_CONST_FUN_OBJ_1(display_get_width_obj, display_get_width);
 
 static mp_obj_t display_get_height(mp_obj_t self_in) {
     mp_display_obj_t *self = MP_OBJ_TO_PTR(self_in);
     return MP_OBJ_NEW_SMALL_INT(self->height);
 }
-static MP_DEFINE_CONST_FUN_OBJ_1(display_get_height_obj, display_get_height);
+//static MP_DEFINE_CONST_FUN_OBJ_1(display_get_height_obj, display_get_height);
 
 static mp_obj_t display_get_rotation(mp_obj_t self_in) {
     mp_display_obj_t *self = MP_OBJ_TO_PTR(self_in);
     return MP_OBJ_NEW_SMALL_INT(self->rotation);
 }
-static MP_DEFINE_CONST_FUN_OBJ_1(display_get_rotation_obj, display_get_rotation);
+//static MP_DEFINE_CONST_FUN_OBJ_1(display_get_rotation_obj, display_get_rotation);
 
 static mp_obj_t display_set_rotation(mp_obj_t self_in, mp_obj_t value) {
     mp_display_obj_t *self = MP_OBJ_TO_PTR(self_in);
@@ -170,7 +186,7 @@ static mp_obj_t display_set_rotation(mp_obj_t self_in, mp_obj_t value) {
     self->set_rotation_func(self, rot);
     return mp_const_none;
 }
-static MP_DEFINE_CONST_FUN_OBJ_2(display_set_rotation_obj, display_set_rotation);
+//static MP_DEFINE_CONST_FUN_OBJ_2(display_set_rotation_obj, display_set_rotation);
 
 static mp_obj_t display_cmd(mp_obj_t self_in, mp_obj_t cmd_in) {
     mp_display_obj_t *self = MP_OBJ_TO_PTR(self_in);
@@ -189,12 +205,33 @@ static mp_obj_t display_cmd_data(mp_obj_t self_in, mp_obj_t cmd_in, mp_obj_t dat
 }
 static MP_DEFINE_CONST_FUN_OBJ_3(display_cmd_data_obj, display_cmd_data);
 
+//static mp_obj_t display_show(mp_obj_t self_in) {
+//    mp_display_obj_t *self = MP_OBJ_TO_PTR(self_in);
+//    display_set_window(self, 0, 0, self->width, self->height);
+//    display_write_data(self, self->buffer, self->buffer_size);
+//    return mp_const_none;
+//}
+
+//static mp_obj_t display_show(mp_obj_t self_in) {
+//    mp_display_obj_t *self = MP_OBJ_TO_PTR(self_in);
+//    display_set_window(self, 0, 0, self->width, self->height);
+//    display_cs_low(self);
+//    DC_HIGH(self); // Режим данных
+//    spi_write(self->spi, self->buffer, self->buffer_size);
+//    display_cs_high(self);
+//    return mp_const_none;
+//}
+
 static mp_obj_t display_show(mp_obj_t self_in) {
     mp_display_obj_t *self = MP_OBJ_TO_PTR(self_in);
     display_set_window(self, 0, 0, self->width, self->height);
-    display_write_data(self, self->buffer, self->buffer_size);
+    display_cs_low(self);
+    DC_HIGH(self); // Переходим в режим данных
+    spi_write(self->spi, self->buffer, self->buffer_size);
+    display_cs_high(self);
     return mp_const_none;
 }
+
 static MP_DEFINE_CONST_FUN_OBJ_1(display_show_obj, display_show);
 
 static mp_obj_t display_update_rect(size_t n_args, const mp_obj_t *args) {
@@ -238,18 +275,31 @@ static mp_obj_t display_reset(mp_obj_t self_in) {
 }
 static MP_DEFINE_CONST_FUN_OBJ_1(display_reset_obj, display_reset);
 
-// Properties
-MP_DEFINE_CONST_PROP_GET(display_buffer_prop, display_get_buffer_obj);
-MP_DEFINE_CONST_PROP_GET(display_width_prop, display_get_width_obj);
-MP_DEFINE_CONST_PROP_GET(display_height_prop, display_get_height_obj);
-MP_DEFINE_CONST_PROP_GETSET(display_rotation_prop, display_get_rotation_obj, display_set_rotation_obj);
+void display_attr(mp_obj_t self_in, qstr attr, mp_obj_t *dest) {
+    if (dest[0] == MP_OBJ_NULL) {
+        // --- ЧТЕНИЕ (GET) ---
+        if (attr == MP_QSTR_width) {
+            dest[0] = display_get_width(self_in);
+        } else if (attr == MP_QSTR_height) {
+            dest[0] = display_get_height(self_in);
+        } else if (attr == MP_QSTR_buffer) {
+            dest[0] = display_get_buffer(self_in);
+        } else if (attr == MP_QSTR_rotation) {
+            dest[0] = display_get_rotation(self_in);
+        } else {
+            mp_load_method_maybe(self_in, attr, dest);
+        }
+    } else {
+        if (attr == MP_QSTR_rotation && dest[1] != MP_OBJ_NULL) {
+            display_set_rotation(self_in, dest[1]);
+            dest[0] = MP_OBJ_NULL;
+        }
+    }
+}
 
+// 2. Таблица методов (теперь без свойств, только функции)
 static const mp_rom_map_elem_t display_locals_dict_table[] = {
     { MP_ROM_QSTR(MP_QSTR___del__), MP_ROM_PTR(&display_del_obj) },
-    { MP_ROM_QSTR(MP_QSTR_buffer), MP_ROM_PTR(&display_buffer_prop) },
-    { MP_ROM_QSTR(MP_QSTR_width), MP_ROM_PTR(&display_width_prop) },
-    { MP_ROM_QSTR(MP_QSTR_height), MP_ROM_PTR(&display_height_prop) },
-    { MP_ROM_QSTR(MP_QSTR_rotation), MP_ROM_PTR(&display_rotation_prop) },
     { MP_ROM_QSTR(MP_QSTR_cmd), MP_ROM_PTR(&display_cmd_obj) },
     { MP_ROM_QSTR(MP_QSTR_cmd_data), MP_ROM_PTR(&display_cmd_data_obj) },
     { MP_ROM_QSTR(MP_QSTR_show), MP_ROM_PTR(&display_show_obj) },
@@ -259,10 +309,12 @@ static const mp_rom_map_elem_t display_locals_dict_table[] = {
 };
 static MP_DEFINE_CONST_DICT(display_locals_dict, display_locals_dict_table);
 
+// 3. Определение типа (исправленный макрос)
 MP_DEFINE_CONST_OBJ_TYPE(
     mp_type_display,
     MP_QSTR_Display,
     MP_TYPE_FLAG_NONE,
-    make_new = display_make_new,
-    locals_dict = &display_locals_dict
+    make_new, display_make_new,
+    locals_dict, &display_locals_dict,
+    attr, display_attr  // Подключаем наш обработчик свойств
 );

@@ -1,18 +1,18 @@
+// spi_displays/st7735.c
 #include "display.h"
 #include "py/mphal.h"
 
-// st7735 initialization sequence
+// st7735 initialization sequence // cmd, len data, latency, data
 typedef struct {
     uint8_t cmd;
     uint8_t len;
     uint8_t delay;
     uint8_t data[16];
 } st7735_init_cmd_t;
-
-// cmd, len data, latency, data
 static const st7735_init_cmd_t st7735_init_sequence[] = {
     {0x01, 0, 150, {}},
     {0x11, 0, 150, {}},
+    {0x3A, 1, 0, {0x05}},
     {0xB1, 3, 0, {0x01, 0x2C, 0x2D}},
     {0xB2, 3, 0, {0x01, 0x2C, 0x2D}},
     {0xB3, 6, 0, {0x01, 0x2C, 0x2D, 0x01, 0x2C, 0x2D}},
@@ -25,12 +25,21 @@ static const st7735_init_cmd_t st7735_init_sequence[] = {
     {0xC5, 1, 0, {0x0E}},
     {0xE0, 16, 0, {0x0F, 0x1A, 0x0F, 0x18, 0x2F, 0x28, 0x20, 0x22, 0x1F, 0x1B, 0x23, 0x37, 0x00, 0x07, 0x02, 0x10}},
     {0xE1, 16, 0, {0x0F, 0x1B, 0x0F, 0x17, 0x33, 0x2C, 0x29, 0x2E, 0x30, 0x30, 0x39, 0x3F, 0x00, 0x07, 0x03, 0x10}},
-    {0x2A, 4, 0, {0x00, 0x00, 0x00, 0x7F}},
-    {0x2B, 4, 0, {0x00, 0x00, 0x00, 0x9F}},
-    {0x36, 1, 0, {0x00}},
     {0x29, 0, 100, {}},
     {0x00, 0, 0, {}}
 };
+
+static void st7735_set_rotation(mp_display_obj_t *self, uint8_t rot) {
+    self->rotation = rot;
+    uint8_t madctl = self->bgr ? 0x08 : 0x00;
+    switch (rot) {
+        case 0: madctl |= 0x00; break;
+        case 1: madctl |= 0x60; break;
+        case 2: madctl |= 0xC0; break;
+        case 3: madctl |= 0xA0; break;
+    }
+    display_send_cmd_data(self, 0x36, &madctl, 1);
+}
 
 static void st7735_init(mp_display_obj_t *self) {
     if (self->rst != (mp_hal_pin_obj_t)-1) {
@@ -47,18 +56,8 @@ static void st7735_init(mp_display_obj_t *self) {
             mp_hal_delay_ms(entry->delay);
         }
     }
-}
-
-static void st7735_set_rotation(mp_display_obj_t *self, uint8_t rot) {
-    self->rotation = rot;
-    uint8_t madctl = self->bgr ? 0x08 : 0x00;
-    switch (rot) {
-        case 0: madctl |= 0x00; break;
-        case 1: madctl |= 0x60; break;
-        case 2: madctl |= 0xC0; break;
-        case 3: madctl |= 0xA0; break;
-    }
-    display_send_cmd_data(self, 0x36, &madctl, 1);
+    st7735_set_rotation(self, self->rotation);
+    display_set_window(self, 0, 0, self->width, self->height);
 }
 
 static mp_obj_t st7735_make_new(const mp_obj_type_t *type, size_t n_args, size_t n_kw, const mp_obj_t *all_args) {

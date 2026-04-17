@@ -2,13 +2,13 @@
 #include "display.h"
 #include "py/mphal.h"
 
-// st7735 initialization sequence // cmd, len data, latency, data
 typedef struct {
     uint8_t cmd;
     uint8_t len;
     uint8_t delay;
     uint8_t data[16];
 } st7735_init_cmd_t;
+
 static const st7735_init_cmd_t st7735_init_sequence[] = {
     {0x01, 0, 150, {}},
     {0x11, 0, 150, {}},

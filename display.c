@@ -4,8 +4,10 @@
 #include "py/objarray.h"
 #include "py/objtype.h"
 #include "extmod/virtpin.h"
-#include "extmod/modmachine.h"
+#if MICROPY_PY_MACHINE_RP2
 #include "hardware/spi.h"
+#endif
+#include "extmod/modmachine.h"
 #include "py/obj.h"
 #include "py/runtime.h"
 #include <stdio.h>
@@ -66,7 +68,7 @@ void display_reset_hw(mp_display_obj_t *self) {
     }
 }
 
-static void display_set_window(mp_display_obj_t *self, uint16_t x, uint16_t y, uint16_t w, uint16_t h) {
+void display_set_window(mp_display_obj_t *self, uint16_t x, uint16_t y, uint16_t w, uint16_t h) {
     uint8_t x_buf[4] = {x >> 8, x & 0xFF, (x + w - 1) >> 8, (x + w - 1) & 0xFF};
     uint8_t y_buf[4] = {y >> 8, y & 0xFF, (y + h - 1) >> 8, (y + h - 1) & 0xFF};
     display_send_cmd_data(self, 0x2A, x_buf, 4);

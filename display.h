@@ -33,6 +33,7 @@ void display_write_data(mp_display_obj_t *self, const uint8_t *data, size_t len)
 void display_reset_hw(mp_display_obj_t *self);
 void display_set_rotation_default(mp_display_obj_t *self, uint8_t rot);
 void display_attr(mp_obj_t self_in, qstr attr, mp_obj_t *dest);
+void display_set_window(mp_display_obj_t *self, uint16_t x, uint16_t y, uint16_t w, uint16_t h);
 size_t display_get_pixel_offset(mp_display_obj_t *self, uint16_t x, uint16_t y);
 mp_obj_t display_make_new_base(const mp_obj_type_t *type, size_t n_args, size_t n_kw, const mp_obj_t *all_args);
 

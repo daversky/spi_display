@@ -298,8 +298,31 @@ static mp_obj_t display_text(size_t n_args, const mp_obj_t *args) {
     const char *str = mp_obj_str_get_str(args[1]);
     int16_t x = mp_obj_get_int(args[2]);
     int16_t y = mp_obj_get_int(args[3]);
-    uint16_t color = (uint16_t)mp_obj_get_int(args[4]);
     int font_id = (n_args > 5) ? mp_obj_get_int(args[5]) : 0;
+    uint16_t color;
+    // Определяем тип 4-го аргумента (цвет)
+    if (mp_obj_is_type(args[4], &mp_type_tuple)) {
+        // Это кортеж (r, g, b)
+        mp_obj_t *items;
+        size_t len;
+        mp_obj_tuple_get(args[4], &len, &items);
+        if (len != 3) {
+            mp_raise_ValueError(MP_ERROR_TEXT("color tuple must have 3 elements (r,g,b)"));
+        }
+        int r = mp_obj_get_int(items[0]);
+        int g = mp_obj_get_int(items[1]);
+        int b = mp_obj_get_int(items[2]);
+        // Конвертация RGB (0-255) в RGB565 (little-endian порядок для вашего дисплея)
+        uint16_t rgb565 = ((r >> 3) << 11) | ((g >> 2) << 5) | (b >> 3);
+        // Swap bytes для little-endian (если нужно)
+        color = (rgb565 << 8) | (rgb565 >> 8);
+    } else {
+        // Обычное число
+        uint16_t raw_color = (uint16_t)mp_obj_get_int(args[4]);
+        // Swap bytes для little-endian
+        color = (raw_color << 8) | (raw_color >> 8);
+    }
+
     fonts_draw_text(self, str, x, y, color, font_id);
     return mp_const_none;
 }

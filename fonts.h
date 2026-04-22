@@ -30,5 +30,9 @@ extern const GFXfont Font_L_12;
 extern const GFXfont Font_C_12;
 extern const GFXfont Font_L_16;
 extern const GFXfont Font_C_16;
+extern const GFXfont Font_L_20;
+extern const GFXfont Font_C_20;
+extern const GFXfont Font_L_24;
+extern const GFXfont Font_C_24;
 
 #endif // MICROPY_INCLUDED_SPI_DISPLAYS_FONTS_H

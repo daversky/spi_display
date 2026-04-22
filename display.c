@@ -45,15 +45,15 @@ void display_write_data(mp_display_obj_t *self, const uint8_t *data, size_t len)
 }
 
 void display_send_cmd_data(mp_display_obj_t *self, uint8_t cmd, const uint8_t *data, size_t data_len) {
-    mp_printf(&mp_plat_print, "CMD: 0x%02X", cmd);
-    if (data_len > 0) {
-        mp_printf(&mp_plat_print, " DATA[%u]:", (unsigned int)data_len);
-        for (size_t i = 0; i < data_len && i < 8; i++) { // Выведем первые 8 байт
-            mp_printf(&mp_plat_print, " %02X", data[i]);
-        }
-        if (data_len > 8) mp_printf(&mp_plat_print, "...");
-    }
-    mp_printf(&mp_plat_print, "\n");
+    // mp_printf(&mp_plat_print, "CMD: 0x%02X", cmd);
+    // if (data_len > 0) {
+    //     mp_printf(&mp_plat_print, " DATA[%u]:", (unsigned int)data_len);
+    //     for (size_t i = 0; i < data_len && i < 8; i++) { // Выведем первые 8 байт
+    //         mp_printf(&mp_plat_print, " %02X", data[i]);
+    //     }
+    //     if (data_len > 8) mp_printf(&mp_plat_print, "...");
+    // }
+    // mp_printf(&mp_plat_print, "\n");
     display_send_cmd(self, cmd);
     if (data_len > 0) {
         display_write_data(self, data, data_len);
@@ -182,7 +182,6 @@ static mp_obj_t display_cmd_data(mp_obj_t self_in, mp_obj_t cmd_in, mp_obj_t dat
     return mp_const_none;
 }
 static MP_DEFINE_CONST_FUN_OBJ_3(display_cmd_data_obj, display_cmd_data);
-
 
 static mp_obj_t display_show(mp_obj_t self_in) {
     mp_display_obj_t *self = MP_OBJ_TO_PTR(self_in);

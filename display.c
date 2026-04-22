@@ -45,15 +45,15 @@ void display_write_data(mp_display_obj_t *self, const uint8_t *data, size_t len)
 }
 
 void display_send_cmd_data(mp_display_obj_t *self, uint8_t cmd, const uint8_t *data, size_t data_len) {
-    // mp_printf(&mp_plat_print, "CMD: 0x%02X", cmd);
-    // if (data_len > 0) {
-    //     mp_printf(&mp_plat_print, " DATA[%u]:", (unsigned int)data_len);
-    //     for (size_t i = 0; i < data_len && i < 8; i++) { // Выведем первые 8 байт
-    //         mp_printf(&mp_plat_print, " %02X", data[i]);
-    //     }
-    //     if (data_len > 8) mp_printf(&mp_plat_print, "...");
-    // }
-    // mp_printf(&mp_plat_print, "\n");
+    mp_printf(&mp_plat_print, "CMD: 0x%02X", cmd);
+    if (data_len > 0) {
+        mp_printf(&mp_plat_print, " DATA[%u]:", (unsigned int)data_len);
+        for (size_t i = 0; i < data_len && i < 8; i++) { // Выведем первые 8 байт
+            mp_printf(&mp_plat_print, " %02X", data[i]);
+        }
+        if (data_len > 8) mp_printf(&mp_plat_print, "...");
+    }
+    mp_printf(&mp_plat_print, "\n");
     display_send_cmd(self, cmd);
     if (data_len > 0) {
         display_write_data(self, data, data_len);
@@ -328,12 +328,16 @@ void display_attr(mp_obj_t self_in, qstr attr, mp_obj_t *dest) {
     if (dest[0] == MP_OBJ_NULL) {
         if (attr == MP_QSTR_width) {
             dest[0] = mp_obj_new_int(self->width);
+            return;
         } else if (attr == MP_QSTR_height) {
             dest[0] = mp_obj_new_int(self->height);
+            return;
         } else if (attr == MP_QSTR_buffer) {
             dest[0] = self->buffer_obj;
+            return;
         } else if (attr == MP_QSTR_rotation) {
             dest[0] = mp_obj_new_int(self->rotation);
+            return;
         } else {
             const mp_obj_type_t *type = mp_obj_get_type(self_in);
             mp_obj_dict_t *locals_dict = MP_OBJ_TYPE_GET_SLOT(type, locals_dict);
@@ -346,7 +350,7 @@ void display_attr(mp_obj_t self_in, qstr attr, mp_obj_t *dest) {
                 }
             }
             const mp_obj_type_t *parent = MP_OBJ_TYPE_GET_SLOT(type, parent);
-            if (parent != NULL) {
+            if (parent != NULL && parent != type) {
                 mp_obj_dict_t *p_locals = MP_OBJ_TYPE_GET_SLOT(parent, locals_dict);
                 if (p_locals != NULL) {
                     mp_map_elem_t *p_elem = mp_map_lookup(&p_locals->map, MP_OBJ_NEW_QSTR(attr), MP_MAP_LOOKUP);
@@ -407,7 +411,7 @@ static const mp_rom_map_elem_t display_locals_dict_table[] = {
     { MP_ROM_QSTR(MP_QSTR_update_rect), MP_ROM_PTR(&display_update_rect_obj) },
     { MP_ROM_QSTR(MP_QSTR_set_backlight), MP_ROM_PTR(&display_set_backlight_obj) },
     { MP_ROM_QSTR(MP_QSTR_reset), MP_ROM_PTR(&display_reset_obj) },
-    { MP_ROM_QSTR(MP_QSTR_text ), MP_ROM_PTR(&display_text_obj) },
+    { MP_ROM_QSTR(MP_QSTR_text), MP_ROM_PTR(&display_text_obj) },
 };
 static MP_DEFINE_CONST_DICT(display_locals_dict, display_locals_dict_table);
 
@@ -417,5 +421,6 @@ MP_DEFINE_CONST_OBJ_TYPE(
     MP_TYPE_FLAG_NONE,
     make_new, display_make_new,
     locals_dict, &display_locals_dict,
-    attr, display_attr
+    attr, display_attr,
+    parent, NULL
 );

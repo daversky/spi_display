@@ -93,6 +93,82 @@ void display_set_rotation_default(mp_display_obj_t *self, uint8_t rot) {
     self->rotation = rot;
 }
 
+static uint32_t decode_utf8(const char **ptr) {
+    const uint8_t *s = (const uint8_t *)*ptr;
+    uint32_t res = *s++;
+    if (res >= 0x80) {
+        if (res < 0xe0) {
+            res = ((res & 0x1f) << 6) | (*s++ & 0x3f);
+        } else if (res < 0xf0) {
+            res = ((res & 0x0f) << 12) | ((s[0] & 0x3f) << 6) | (s[1] & 0x3f);
+            s += 2;
+        }
+    }
+    *ptr = (const char *)s;
+    return res;
+}
+static void draw_gfx_char(mp_display_obj_t *self, int16_t x, int16_t y, uint16_t c, uint16_t color, const GFXfont *font) {
+    uint16_t glyph_index = c - font->first;
+    GFXglyph *glyph = &(font->glyph[glyph_index]);
+    uint8_t *bitmap = font->bitmap;
+    uint16_t bo = glyph->bitmapOffset;
+    uint8_t  w  = glyph->width;
+    uint8_t  h  = glyph->height;
+    int8_t   xo = glyph->xOffset;
+    int8_t   yo = glyph->yOffset;
+    uint8_t  xx, yy, bits = 0, bit = 0;
+    uint16_t *buffer = (uint16_t *)self->buffer;
+    for (yy = 0; yy < h; yy++) {
+        for (xx = 0; xx < w; xx++) {
+            if (!(bit++ & 7)) {
+                bits = bitmap[bo++];
+            }
+            if (bits & 0x80) {
+                int16_t cur_x = x + xo + xx;
+//                int16_t cur_y = y + (font->yAdvance * 3 / 4) + yo + yy;
+                int16_t cur_y = y + yo + yy;
+                if (cur_x >= 0 && cur_x < self->width && cur_y >= 0 && cur_y < self->height) {
+                    buffer[cur_y * self->width + cur_x] = (color << 8) | (color >> 8);
+                }
+            }
+            bits <<= 1;
+        }
+    }
+}
+static void fonts_draw_text(mp_display_obj_t *self, const char *str, int16_t x, int16_t y, uint16_t color, int font_id) {
+    const GFXfont *f_latin = &Font_L_6;
+    const GFXfont *f_cyrillic = &Font_C_6;
+    switch (font_id) {
+    case 8:  f_latin = &Font_L_8;  f_cyrillic = &Font_C_8;  break;
+    case 12: f_latin = &Font_L_12; f_cyrillic = &Font_C_12; break;
+    case 16: f_latin = &Font_L_16; f_cyrillic = &Font_C_16; break;
+    case 20: f_latin = &Font_L_20; f_cyrillic = &Font_C_20; break;
+    case 24: f_latin = &Font_L_24; f_cyrillic = &Font_C_24; break;
+    default: f_latin = &Font_L_6;  f_cyrillic = &Font_C_6;  break;
+}
+    int16_t top_offset = 0;
+    if (f_latin->glyph) {
+        top_offset = -(f_latin->glyph[65 - f_latin->first].yOffset);
+    }
+    int16_t baseline_y = y + top_offset;
+    while (*str) {
+        uint32_t code = decode_utf8(&str);
+        const GFXfont *current_font = NULL;
+        if (code >= 32 && code <= 127) {
+            current_font = f_latin;
+        } else if (code >= 1025 && code <= 1105) {
+            current_font = f_cyrillic;
+        }
+        if (current_font) {
+            draw_gfx_char(self, x, baseline_y, (uint16_t)code, color, current_font);
+            x += current_font->glyph[code - current_font->first].xAdvance;
+        } else {
+            x += (font_id / 2 + 2);
+        }
+        if (x >= self->width) break;
+    }
+}
+
 // ---------- Base constructor ----------
 mp_obj_t display_make_new_base(const mp_obj_type_t *type, size_t n_args, size_t n_kw, const mp_obj_t *all_args) {
     enum { ARG_spi, ARG_width, ARG_height, ARG_dc, ARG_cs, ARG_rst, ARG_bl, ARG_bgr, ARG_backlight_active_high, ARG_rotation, ARG_buffer };
@@ -297,35 +373,31 @@ static mp_obj_t display_text(size_t n_args, const mp_obj_t *args) {
     const char *str = mp_obj_str_get_str(args[1]);
     int16_t x = mp_obj_get_int(args[2]);
     int16_t y = mp_obj_get_int(args[3]);
-    int font_id = (n_args > 5) ? mp_obj_get_int(args[5]) : 0;
-    uint16_t color;
-    // Определяем тип 4-го аргумента (цвет)
-    if (mp_obj_is_type(args[4], &mp_type_tuple)) {
-        // Это кортеж (r, g, b)
-        mp_obj_t *items;
-        size_t len;
-        mp_obj_tuple_get(args[4], &len, &items);
-        if (len != 3) {
-            mp_raise_ValueError(MP_ERROR_TEXT("color tuple must have 3 elements (r,g,b)"));
+    uint16_t color = 0xFFFF;
+    if (n_args > 4) {
+        if (mp_obj_is_type(args[4], &mp_type_tuple)) {
+            mp_obj_t *items;
+            size_t len;
+            mp_obj_tuple_get(args[4], &len, &items);
+            if (len != 3) {
+                mp_raise_ValueError(MP_ERROR_TEXT("color tuple must have 3 elements (r,g,b)"));
+            }
+            int r = mp_obj_get_int(items[0]);
+            int g = mp_obj_get_int(items[1]);
+            int b = mp_obj_get_int(items[2]);
+            uint16_t rgb565 = ((r >> 3) << 11) | ((g >> 2) << 5) | (b >> 3);
+            color = (rgb565 << 8) | (rgb565 >> 8);
+        } else {
+            uint16_t raw_color = (uint16_t)mp_obj_get_int(args[4]);
+            color = (raw_color << 8) | (raw_color >> 8);
         }
-        int r = mp_obj_get_int(items[0]);
-        int g = mp_obj_get_int(items[1]);
-        int b = mp_obj_get_int(items[2]);
-        // Конвертация RGB (0-255) в RGB565 (little-endian порядок для вашего дисплея)
-        uint16_t rgb565 = ((r >> 3) << 11) | ((g >> 2) << 5) | (b >> 3);
-        // Swap bytes для little-endian (если нужно)
-        color = (rgb565 << 8) | (rgb565 >> 8);
-    } else {
-        // Обычное число
-        uint16_t raw_color = (uint16_t)mp_obj_get_int(args[4]);
-        // Swap bytes для little-endian
-        color = (raw_color << 8) | (raw_color >> 8);
     }
+    int font_id = (n_args > 5) ? mp_obj_get_int(args[5]) : 0;
 
     fonts_draw_text(self, str, x, y, color, font_id);
     return mp_const_none;
 }
-MP_DEFINE_CONST_FUN_OBJ_VAR_BETWEEN(display_text_obj, 5, 6, display_text);
+MP_DEFINE_CONST_FUN_OBJ_VAR_BETWEEN(display_text_obj, 4, 6, display_text);
 
 static const mp_rom_map_elem_t display_locals_dict_table[] = {
     { MP_ROM_QSTR(MP_QSTR___del__), MP_ROM_PTR(&display_del_obj) },

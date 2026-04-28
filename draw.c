@@ -4,7 +4,6 @@
 #include "py/runtime.h"
 #include <stdlib.h>
 
-// --- Вспомогательный макрос для распаковки кортежа (x,y) ---
 #define PARSE_COORD(obj, x, y) { \
     size_t _len; mp_obj_t *_items; \
     mp_obj_get_array(obj, &_len, &_items); \
@@ -58,7 +57,8 @@ static uint32_t decode_utf8(const char **ptr) {
     *ptr = (const char *)s;
     return res;
 }
-static void draw_char(mp_display_obj_t *display, int16_t x, int16_t y, uint16_t c, uint16_t color, const GFXfont *font) {
+
+static void draw_char(const mp_display_obj_t *display, const int16_t x, int16_t y, uint16_t c, uint16_t color, const GFXfont *font) {
     if (c < font->first || c > font->last) return;
     uint16_t glyph_index = c - font->first;
     GFXglyph *glyph = &(font->glyph[glyph_index]);
@@ -69,7 +69,7 @@ static void draw_char(mp_display_obj_t *display, int16_t x, int16_t y, uint16_t 
     int8_t xo = glyph->xOffset;
     int8_t yo = glyph->yOffset;
     uint8_t bits = 0, bit = 0;
-    uint16_t *buffer = (uint16_t *)display->buffer;
+    uint16_t *buffer = display->buffer;
     for (uint8_t yy = 0; yy < h; yy++) {
         for (uint8_t xx = 0; xx < w; xx++) {
             if (!(bit++ & 7)) {
@@ -86,7 +86,7 @@ static void draw_char(mp_display_obj_t *display, int16_t x, int16_t y, uint16_t 
         }
     }
 }
-void draw_text(mp_display_obj_t *display, const char *str, int16_t x, int16_t y, uint16_t color, int font_size) {
+void draw_text(const mp_display_obj_t *display, const char *str, int16_t x, int16_t y, uint16_t color, int font_size) {
     const GFXfont *f_latin = &Font_L_6;
     const GFXfont *f_cyrillic = &Font_C_6;
     switch (font_size) {
@@ -99,11 +99,11 @@ void draw_text(mp_display_obj_t *display, const char *str, int16_t x, int16_t y,
     }
     int16_t top_offset = 0;
     if (f_latin->glyph) {
-        top_offset = -(f_latin->glyph[65 - f_latin->first].yOffset);
+        top_offset = (int16_t)(-(f_latin->glyph[65 - f_latin->first].yOffset));
     }
     int16_t baseline_y = y + top_offset;
     while (*str) {
-        uint32_t code = decode_utf8(&str);
+        const uint32_t code = decode_utf8(&str);
         const GFXfont *current_font = NULL;
         if (code >= 32 && code <= 127) {
             current_font = f_latin;
@@ -122,14 +122,14 @@ void draw_text(mp_display_obj_t *display, const char *str, int16_t x, int16_t y,
 
 // plot ...
 // Пиксель
-static inline void plot_pixel(mp_display_obj_t *display, int x, int y, uint16_t color) {
+static void plot_pixel(const mp_display_obj_t *display, int x, int y, uint16_t color) {
     if (x >= 0 && x < display->width && y >= 0 && y < display->height) {
-        uint16_t *buf = (uint16_t *)display->buffer;
+        uint16_t *buf = display->buffer;
         buf[y * display->width + x] = color;
     }
 }
 // horizont line
-static inline void plot_hline(mp_display_obj_t *self, int x1, int x2, int y, uint16_t color) {
+static void plot_hline(const mp_display_obj_t *self, int x1, int x2, const int y, const uint16_t color) {
     if (y < 0 || y >= self->height) return;
     if (x1 > x2) { int t = x1; x1 = x2; x2 = t; }
     if (x1 < 0) x1 = 0;
@@ -143,15 +143,15 @@ static inline void plot_hline(mp_display_obj_t *self, int x1, int x2, int y, uin
 }
 // ....
 // Any Line
-static void plot_line(mp_display_obj_t *self, int x1, int y1, int x2, int y2, uint16_t color) {
+static void plot_line(const mp_display_obj_t *self, int x1, int y1, int x2, int y2, uint16_t color) {
     if (y1 == y2) { plot_hline(self, x1, x2, y1, color); return; }
     int dx = abs(x2 - x1), dy = -abs(y2 - y1);
     int sx = x1 < x2 ? 1 : -1, sy = y1 < y2 ? 1 : -1;
-    int err = dx + dy, e2;
+    int err = dx + dy;
     while (1) {
         plot_pixel(self, x1, y1, color);
         if (x1 == x2 && y1 == y2) break;
-        e2 = 2 * err;
+        int e2 = 2 * err;
         if (e2 >= dy) { err += dy; x1 += sx; }
         if (e2 <= dx) { err += dx; y1 += sy; }
     }
@@ -164,7 +164,7 @@ mp_obj_t draw_text_wrapper(size_t n_args, const mp_obj_t *args) {
     int16_t x = mp_obj_get_int(args[2]);
     int16_t y = mp_obj_get_int(args[3]);
     // Обработка цвета (4-й аргумент)
-    uint16_t color = 0xFFFF; // белый по умолчанию
+    uint16_t color = 0xFFFF;
     if (n_args > 4) {
         if (mp_obj_is_type(args[4], &mp_type_tuple)) {
             // Цвет как кортеж (r,g,b)
@@ -202,7 +202,7 @@ mp_obj_t draw_line_wrapper(size_t n_args, const mp_obj_t *pos_args, mp_map_t *kw
     draw_obj_t *draw_ptr = MP_OBJ_TO_PTR(pos_args[0]);
     mp_display_obj_t *self = draw_ptr->display;
     int x1, y1, x2, y2;
-    uint16_t color = convert_color(args[ARG_color].u_obj);
+    const uint16_t color = convert_color(args[ARG_color].u_obj);
     PARSE_COORD(args[ARG_start].u_obj, x1, y1);
     PARSE_COORD(args[ARG_end].u_obj, x2, y2);
     // draw
@@ -227,7 +227,7 @@ mp_obj_t draw_rect_wrapper(size_t n_args, const mp_obj_t *pos_args, mp_map_t *kw
     mp_display_obj_t *self = draw_ptr->display;
     int x, y;
     PARSE_COORD(args[ARG_start].u_obj, x, y);
-    uint16_t color = convert_color(args[ARG_color].u_obj);
+    const uint16_t color = convert_color(args[ARG_color].u_obj);
     int w = args[ARG_width].u_int;
     int h = args[ARG_height].u_int;
     if (args[ARG_fill].u_bool) {
@@ -286,7 +286,6 @@ mp_obj_t draw_ellipse_wrapper(size_t n_args, const mp_obj_t *pos_args, mp_map_t 
 }
 MP_DEFINE_CONST_FUN_OBJ_KW(draw_ellipse_obj, 1, draw_ellipse_wrapper);
 
-
 // draw.circle(color=0, center=(x,y), radius=0, fill=False)
 mp_obj_t draw_circle_wrapper(size_t n_args, const mp_obj_t *pos_args, mp_map_t *kw_args) {
     enum { ARG_color, ARG_center, ARG_radius, ARG_fill };
@@ -336,43 +335,35 @@ mp_obj_t draw_lines_wrapper(size_t n_args, const mp_obj_t *pos_args, mp_map_t *k
             { MP_QSTR_points, MP_ARG_REQUIRED | MP_ARG_OBJ, {.u_obj = MP_OBJ_NULL} },
             { MP_QSTR_closed, MP_ARG_BOOL, {.u_bool = false} },
     };
-
     mp_arg_val_t args[MP_ARRAY_SIZE(allowed_args)];
     mp_arg_parse_all(n_args - 1, pos_args + 1, kw_args, MP_ARRAY_SIZE(allowed_args), allowed_args, args);
-
     draw_obj_t *draw_ptr = MP_OBJ_TO_PTR(pos_args[0]);
     mp_display_obj_t *self = draw_ptr->display;
-
     size_t num_points;
     mp_obj_t *items;
     mp_obj_get_array(args[ARG_points].u_obj, &num_points, &items);
-
-    if (num_points < 2) return mp_const_none;
-
+    if (num_points < 2) {
+        return mp_const_none;
+    }
     uint16_t color = convert_color(args[ARG_color].u_obj);
-    int x_start, y_start, x_prev, y_prev, x_curr, y_curr;
-
-    // Распаковываем первую точку
+    int x_start, y_start, x_curr, y_curr;
     PARSE_COORD(items[0], x_start, y_start);
-    x_prev = x_start; y_prev = y_start;
-
+    int x_prev = x_start;
+    int y_prev = y_start;
     for (size_t i = 1; i < num_points; i++) {
         PARSE_COORD(items[i], x_curr, y_curr);
         plot_line(self, x_prev, y_prev, x_curr, y_curr, color);
         x_prev = x_curr;
         y_prev = y_curr;
     }
-
     if (args[ARG_closed].u_bool) {
         plot_line(self, x_prev, y_prev, x_start, y_start, color);
     }
-
     return mp_const_none;
 }
 MP_DEFINE_CONST_FUN_OBJ_KW(draw_lines_obj, 1, draw_lines_wrapper);
 
 // draw.polygon(color=(r,g,b), points=[], fill=False)
-// draw.polygon(color=0, points=[], fill=False)
 mp_obj_t draw_polygon_wrapper(size_t n_args, const mp_obj_t *pos_args, mp_map_t *kw_args) {
     enum { ARG_color, ARG_points, ARG_fill };
     static const mp_arg_t allowed_args[] = {
@@ -380,50 +371,38 @@ mp_obj_t draw_polygon_wrapper(size_t n_args, const mp_obj_t *pos_args, mp_map_t 
             { MP_QSTR_points, MP_ARG_REQUIRED | MP_ARG_OBJ, {.u_obj = MP_OBJ_NULL} },
             { MP_QSTR_fill,   MP_ARG_BOOL, {.u_bool = false} },
     };
-
     mp_arg_val_t args[MP_ARRAY_SIZE(allowed_args)];
     mp_arg_parse_all(n_args - 1, pos_args + 1, kw_args, MP_ARRAY_SIZE(allowed_args), allowed_args, args);
-
     draw_obj_t *draw_ptr = MP_OBJ_TO_PTR(pos_args[0]);
     mp_display_obj_t *self = draw_ptr->display;
-
     size_t n;
     mp_obj_t *items;
     mp_obj_get_array(args[ARG_points].u_obj, &n, &items);
-    if (n < 3) return mp_const_none; // Многоугольник минимум из 3 точек
-
-    uint16_t color = convert_color(args[ARG_color].u_obj);
-
+    if (n < 3) {
+        return mp_const_none; // Многоугольник минимум из 3 точек
+    }
+    const uint16_t color = convert_color(args[ARG_color].u_obj);
     if (args[ARG_fill].u_bool) {
-        // --- Алгоритм Scanline Fill ---
         int min_y = self->height, max_y = 0;
-        int *nodes_x = m_new(int, n); // Временный массив для точек пересечения
-
-        // 1. Находим границы многоугольника по Y
+        int *nodes_x = m_new(int, n);
         for (size_t i = 0; i < n; i++) {
-            int x __attribute__((unused)), y;
+            int16_t x __attribute__((unused)), y;
             PARSE_COORD(items[i], x, y);
             if (y < min_y) min_y = y;
             if (y > max_y) max_y = y;
         }
-
-        // Ограничиваем область сканирования экраном
         if (min_y < 0) min_y = 0;
         if (max_y >= self->height) max_y = self->height - 1;
-
-        // 2. Идем по каждой строке (сканлинии)
         for (int py = min_y; py <= max_y; py++) {
             int cnt = 0;
             for (size_t i = 0; i < n; i++) {
-                int x1, y1, x2, y2;
+                int16_t x1, y1, x2, y2;
                 PARSE_COORD(items[i], x1, y1);
                 PARSE_COORD(items[(i + 1) % n], x2, y2);
-
                 if ((y1 < py && y2 >= py) || (y2 < py && y1 >= py)) {
                     nodes_x[cnt++] = x1 + (py - y1) * (x2 - x1) / (y2 - y1);
                 }
             }
-            // Сортируем X пересечений и рисуем линии между парами
             qsort(nodes_x, cnt, sizeof(int), compare_int);
             for (int i = 0; i < cnt; i += 2) {
                 plot_hline(self, nodes_x[i], nodes_x[i+1], py, color);
@@ -431,10 +410,9 @@ mp_obj_t draw_polygon_wrapper(size_t n_args, const mp_obj_t *pos_args, mp_map_t 
         }
         m_del(int, nodes_x, n);
     } else {
-        // --- Просто контур (используем логику lines) ---
-        int x_s, y_s, x_p, y_p, x_c, y_c;
+        int x_s, y_s, x_c, y_c;
         PARSE_COORD(items[0], x_s, y_s);
-        x_p = x_s; y_p = y_s;
+        int x_p = x_s; int y_p = y_s;
         for (size_t i = 1; i < n; i++) {
             PARSE_COORD(items[i], x_c, y_c);
             plot_line(self, x_p, y_p, x_c, y_c, color);
@@ -442,11 +420,9 @@ mp_obj_t draw_polygon_wrapper(size_t n_args, const mp_obj_t *pos_args, mp_map_t 
         }
         plot_line(self, x_p, y_p, x_s, y_s, color);
     }
-
     return mp_const_none;
 }
 MP_DEFINE_CONST_FUN_OBJ_KW(draw_polygon_obj, 1, draw_polygon_wrapper);
-
 
 //  ------------------------- registration -----------------------------
 static const mp_rom_map_elem_t draw_locals_dict_table[] = {

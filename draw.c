@@ -379,7 +379,8 @@ mp_obj_t draw_polygon_wrapper(size_t n_args, const mp_obj_t *pos_args, mp_map_t 
     mp_obj_t *items;
     mp_obj_get_array(args[ARG_points].u_obj, &n, &items);
     if (n < 3) {
-        return mp_const_none; // Многоугольник минимум из 3 точек
+        // Многоугольник минимум из 3 точек
+        return mp_const_none;
     }
     const uint16_t color = convert_color(args[ARG_color].u_obj);
     if (args[ARG_fill].u_bool) {

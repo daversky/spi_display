@@ -186,7 +186,6 @@ mp_obj_t display_make_new_base(const mp_obj_type_t *type, size_t n_args, size_t 
     if (self->buffer == NULL) {
         mp_raise_msg(&mp_type_MemoryError, MP_ERROR_TEXT("failed to allocate display buffer"));
     }
-    self->buffer_allocated = true;
     self->buffer_obj = mp_obj_new_bytearray_by_ref(self->buffer_size, self->buffer);
     self->draw = draw_make_new(self);
     if (self->debug >= 2) {

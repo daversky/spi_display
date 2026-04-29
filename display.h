@@ -1,11 +1,10 @@
 #ifndef MICROPY_INCLUDED_DISPLAY_H
 #define MICROPY_INCLUDED_DISPLAY_H
-
 #include "py/obj.h"
 #include "py/runtime.h"
 #include "py/mphal.h"
 
-typedef struct _mp_display_obj_t {
+typedef struct {
     mp_obj_base_t base;
     mp_obj_t spi;
     mp_obj_t buffer_obj;
@@ -22,7 +21,6 @@ typedef struct _mp_display_obj_t {
     bool bgr;
     bool inverse;
     bool backlight_active_high;
-    bool buffer_allocated;
     void *buffer;
     size_t buffer_size;
     mp_obj_t draw;
@@ -31,7 +29,7 @@ typedef struct _mp_display_obj_t {
 typedef struct {
     uint8_t cmd;
     uint8_t len;
-    uint16_t delay; // delay в миллисекундах
+    uint16_t delay; // ms
     uint8_t data[16];
 } display_init_cmd_t;
 

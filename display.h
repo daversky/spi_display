@@ -41,6 +41,7 @@ extern const mp_obj_type_t mp_type_draw;
 void display_write_cmd_data(mp_display_obj_t *self, uint8_t cmd, const uint8_t *data, size_t data_len);
 void display_set_window(mp_display_obj_t *self, uint16_t x, uint16_t y, uint16_t w, uint16_t h);
 void display_reset_hw(mp_display_obj_t *self);
+void display_init(mp_display_obj_t* self, const display_init_cmd_t* sequence);
 void display_attr(mp_obj_t self_in, qstr attr, mp_obj_t *dest);
 // Типы
 

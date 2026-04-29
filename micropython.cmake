@@ -7,6 +7,7 @@ target_sources(spi_displays INTERFACE
     ${CMAKE_CURRENT_LIST_DIR}/draw.c
     ${CMAKE_CURRENT_LIST_DIR}/st7735.c
     ${CMAKE_CURRENT_LIST_DIR}/st7789.c
+    ${CMAKE_CURRENT_LIST_DIR}/st7796s.c
 )
 target_include_directories(spi_displays INTERFACE ${CMAKE_CURRENT_LIST_DIR})
 target_compile_definitions(spi_displays INTERFACE MICROPY_PY_SPI_DISPLAYS=1)

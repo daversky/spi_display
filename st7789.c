@@ -23,46 +23,13 @@ static const display_init_cmd_t st7789_init_sequence[] = {
     {0, 0, 0, {}} // Маркер конца списка
 };
 
-static uint8_t st7789_get_madctl_value(mp_display_obj_t* self) {
-    uint8_t madctl = self->bgr ? 0x08 : 0x00;
-    switch (self->rotate) {
-        case 0: madctl |= 0x00; break;
-        case 1: madctl |= 0x60; break;
-        case 2: madctl |= 0xC0; break;
-        case 3: madctl |= 0xA0; break;
-    }
-    return madctl;
-}
-
-static void st7789_init(mp_display_obj_t* self) {
-    if (self->rst != (mp_hal_pin_obj_t)-1) {
-        display_reset_hw(self);
-    }
-    for (const display_init_cmd_t* entry = st7789_init_sequence; entry->cmd != 0x00; entry++) {
-        uint8_t cmd = entry->cmd;
-        const uint8_t* data = entry->data;
-        uint8_t len = entry->len;
-
-        uint8_t dynamic_data;
-        if (cmd == 0x36) {
-            dynamic_data = st7789_get_madctl_value(self);
-            data = &dynamic_data;
-            len = 1;
-        }
-        display_write_cmd_data(self, cmd, data, len);
-        if (entry->delay > 0) {
-            mp_hal_delay_ms(entry->delay);
-        }
-    }
-    display_write_cmd_data(self, self->inverse ? 0x21 : 0x20, NULL, 0);
-    display_set_window(self, 0, 0, self->width, self->height);
-}
-
 static mp_obj_t st7789_make_new(const mp_obj_type_t* type, size_t n_args, size_t n_kw, const mp_obj_t* all_args) {
-    // Создаем DisplayCore объект
     mp_obj_t display_obj = display_make_new_base(&mp_type_display_core, n_args, n_kw, all_args);
     mp_display_obj_t* self = MP_OBJ_TO_PTR(display_obj);
-    st7789_init(self);
+    if (self->debug >= 1) {
+        mp_printf(&mp_plat_print, "Init st7789\n");
+    }
+    display_init(self, st7789_init_sequence);
     self->base.type = type;
     return display_obj;
 }

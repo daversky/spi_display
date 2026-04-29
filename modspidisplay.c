@@ -5,6 +5,7 @@
 
 extern const mp_obj_type_t mp_type_st7735;
 extern const mp_obj_type_t mp_type_st7789;
+extern const mp_obj_type_t mp_type_st7796s;
 
 static mp_obj_t rgb_to_rgb565(mp_obj_t r_obj, mp_obj_t g_obj, mp_obj_t b_obj) {
     int r = mp_obj_get_int(r_obj);
@@ -20,10 +21,12 @@ MP_DEFINE_CONST_FUN_OBJ_3(rgb_to_rgb565_obj, rgb_to_rgb565);
 
 static const mp_rom_map_elem_t spi_displays_globals_table[] = {
     {MP_ROM_QSTR(MP_QSTR___name__), MP_ROM_QSTR(MP_QSTR_spi_displays)},
+    {MP_ROM_QSTR(MP_QSTR_RGBtoRGB565), MP_ROM_PTR(&rgb_to_rgb565_obj)},
     {MP_ROM_QSTR(MP_QSTR_Display), MP_ROM_PTR(&mp_type_display)},
     {MP_ROM_QSTR(MP_QSTR_st7735), MP_ROM_PTR(&mp_type_st7735)},
     {MP_ROM_QSTR(MP_QSTR_st7789), MP_ROM_PTR(&mp_type_st7789)},
-    {MP_ROM_QSTR(MP_QSTR_RGBtoRGB565), MP_ROM_PTR(&rgb_to_rgb565_obj)},
+    {MP_ROM_QSTR(MP_QSTR_st7796s), MP_ROM_PTR(&mp_type_st7796s)},
+
 };
 static MP_DEFINE_CONST_DICT(spi_displays_globals, spi_displays_globals_table);
 

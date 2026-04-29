@@ -67,6 +67,42 @@ void display_set_window(mp_display_obj_t *self, uint16_t x, uint16_t y, uint16_t
     display_write_cmd_data(self, 0x2C, NULL, 0);
 }
 
+static uint8_t calc_madctl_value(mp_display_obj_t* self) {
+    uint8_t madctl = self->bgr ? 0x08 : 0x00;
+    switch (self->rotate) {
+        case 0: madctl |= 0x00; break;
+        case 1: madctl |= 0x60; break;
+        case 2: madctl |= 0xC0; break;
+        case 3: madctl |= 0xA0; break;
+    }
+    return madctl;
+}
+
+void display_init(mp_display_obj_t* self, const display_init_cmd_t* sequence) {
+    if (self->rst != (mp_hal_pin_obj_t)-1) {
+        display_reset_hw(self);
+    }
+    for (const display_init_cmd_t* entry = sequence; entry->cmd != 0x00; entry++) {
+        uint8_t cmd = entry->cmd;
+        const uint8_t* data = entry->data;
+        uint8_t len = entry->len;
+        uint8_t dynamic_data;
+        if (cmd == 0x36) {
+            dynamic_data = calc_madctl_value(self);
+            data = &dynamic_data;
+            len = 1;
+        }
+        if (cmd == 0x20 || cmd == 0x21) {
+            cmd = self->inverse ? 0x21 : 0x20;
+        }
+        display_write_cmd_data(self, cmd, data, len);
+        if (entry->delay > 0) {
+            mp_hal_delay_ms(entry->delay);
+        }
+    }
+    display_set_window(self, 0, 0, self->width, self->height);
+}
+
 mp_obj_t display_show(mp_obj_t self_in) {
     mp_display_obj_t *self = MP_OBJ_TO_PTR(self_in);
 
@@ -188,7 +224,7 @@ mp_obj_t display_make_new_base(const mp_obj_type_t *type, size_t n_args, size_t 
     }
     self->buffer_obj = mp_obj_new_bytearray_by_ref(self->buffer_size, self->buffer);
     self->draw = draw_make_new(self);
-    if (self->debug >= 2) {
+    if (self->debug >= 1) {
         mp_printf(&mp_plat_print, "Init parameters:\n");
         mp_printf(&mp_plat_print, "  - width:                 %u\n", (unsigned int)width);
         mp_printf(&mp_plat_print, "  - height:                %u\n", (unsigned int)height);

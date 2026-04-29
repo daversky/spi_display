@@ -3,6 +3,7 @@
 #include "fonts.h"
 #include "py/runtime.h"
 #include <stdlib.h>
+#include <math.h>
 
 #define PARSE_COORD(obj, x, y) { \
     size_t _len; mp_obj_t *_items; \
@@ -425,9 +426,106 @@ mp_obj_t draw_polygon_wrapper(size_t n_args, const mp_obj_t *pos_args, mp_map_t 
 }
 MP_DEFINE_CONST_FUN_OBJ_KW(draw_polygon_obj, 1, draw_polygon_wrapper);
 
+// draw.arrow(color=0, center=(x,y), size=10, angle=0, fill=False)
+mp_obj_t draw_arrow_wrapper(size_t n_args, const mp_obj_t *pos_args, mp_map_t *kw_args) {
+    enum { ARG_color, ARG_center, ARG_size, ARG_angle, ARG_fill };
+    static const mp_arg_t allowed_args[] = {
+            { MP_QSTR_color,  MP_ARG_REQUIRED | MP_ARG_OBJ, {.u_obj = MP_OBJ_NULL} },
+            { MP_QSTR_center, MP_ARG_REQUIRED | MP_ARG_OBJ, {.u_obj = MP_OBJ_NULL} },
+            { MP_QSTR_size,   MP_ARG_REQUIRED | MP_ARG_INT, {.u_int = 10} },
+            { MP_QSTR_angle,  MP_ARG_INT, {.u_int = 0} },
+            { MP_QSTR_fill,   MP_ARG_BOOL, {.u_bool = false} },
+    };
+    mp_arg_val_t args[MP_ARRAY_SIZE(allowed_args)];
+    mp_arg_parse_all(n_args - 1, pos_args + 1, kw_args, MP_ARRAY_SIZE(allowed_args), allowed_args, args);
+    draw_obj_t *draw_ptr = MP_OBJ_TO_PTR(pos_args[0]);
+    mp_display_obj_t *self = draw_ptr->display;
+    int cx, cy;
+    PARSE_COORD(args[ARG_center].u_obj, cx, cy);
+    int size = args[ARG_size].u_int;
+    float angle_deg = args[ARG_angle].u_int;
+    uint16_t color = convert_color(args[ARG_color].u_obj);
+    bool fill = args[ARG_fill].u_bool;
+    // Конвертируем угол в радианы (0 градусов = вверх)
+    float rad = (angle_deg - 90) * 3.14159265359f / 180.0f;
+    float cos_a = cosf(rad);
+    float sin_a = sinf(rad);
+    // Точки стрелки относительно центра
+    int points_x[4], points_y[4];
+    // Кончик (впереди)
+    points_x[0] = cx + (int)(size * cos_a);
+    points_y[0] = cy + (int)(size * sin_a);
+    // Левое крыло (сзади-слева)
+    points_x[1] = cx + (int)(-size * cos_a - (size/1.5f) * sin_a);
+    points_y[1] = cy + (int)(-size * sin_a + (size/1.5f) * cos_a);
+    // Выемка (центр основания)
+    points_x[2] = cx + (int)((-size/2) * cos_a);
+    points_y[2] = cy + (int)((-size/2) * sin_a);
+    // Правое крыло (сзади-справа)
+    points_x[3] = cx + (int)(-size * cos_a + (size/1.5f) * sin_a);
+    points_y[3] = cy + (int)(-size * sin_a - (size/1.5f) * cos_a);
+    // Рисуем контур
+    plot_line(self, points_x[0], points_y[0], points_x[1], points_y[1], color);
+    plot_line(self, points_x[1], points_y[1], points_x[2], points_y[2], color);
+    plot_line(self, points_x[2], points_y[2], points_x[3], points_y[3], color);
+    plot_line(self, points_x[3], points_y[3], points_x[0], points_y[0], color);
+    if (fill) {
+        // Заливка методом сканирования
+        int min_y = points_y[0], max_y = points_y[0];
+        for (int i = 1; i < 4; i++) {
+            if (points_y[i] < min_y) min_y = points_y[i];
+            if (points_y[i] > max_y) max_y = points_y[i];
+        }
+        for (int py = min_y; py <= max_y; py++) {
+            int nodes_x[4];
+            int node_cnt = 0;
+            for (int i = 0; i < 4; i++) {
+                int x1 = points_x[i], y1 = points_y[i];
+                int x2 = points_x[(i+1)%4], y2 = points_y[(i+1)%4];
+                if ((y1 < py && y2 >= py) || (y2 < py && y1 >= py)) {
+                    nodes_x[node_cnt++] = x1 + (py - y1) * (x2 - x1) / (y2 - y1);
+                }
+            }
+            if (node_cnt >= 2) {
+                qsort(nodes_x, node_cnt, sizeof(int), compare_int);
+                for (int i = 0; i < node_cnt; i += 2) {
+                    plot_hline(self, nodes_x[i], nodes_x[i+1], py, color);
+                }
+            }
+        }
+    }
+    return mp_const_none;
+}
+MP_DEFINE_CONST_FUN_OBJ_KW(draw_arrow_obj, 1, draw_arrow_wrapper);
+
+// draw.fill(color=0)
+mp_obj_t draw_fill_wrapper(size_t n_args, const mp_obj_t *pos_args, mp_map_t *kw_args) {
+    enum { ARG_color };
+    static const mp_arg_t allowed_args[] = {
+            { MP_QSTR_color, MP_ARG_OBJ, {.u_obj = MP_OBJ_NULL} },
+    };
+    mp_arg_val_t args[MP_ARRAY_SIZE(allowed_args)];
+    mp_arg_parse_all(n_args - 1, pos_args + 1, kw_args, MP_ARRAY_SIZE(allowed_args), allowed_args, args);
+    draw_obj_t *draw_ptr = MP_OBJ_TO_PTR(pos_args[0]);
+    mp_display_obj_t *self = draw_ptr->display;
+    uint16_t color = 0x0000; // чёрный по умолчанию
+    if (args[ARG_color].u_obj != MP_OBJ_NULL) {
+        color = convert_color(args[ARG_color].u_obj);
+    }
+    // Заливка всего буфера
+    uint16_t *buf = (uint16_t *)self->buffer;
+    size_t count = self->buffer_size / 2;
+    for (size_t i = 0; i < count; i++) {
+        buf[i] = color;
+    }
+    return mp_const_none;
+}
+MP_DEFINE_CONST_FUN_OBJ_KW(draw_fill_obj, 1, draw_fill_wrapper);
+
+
 //  ------------------------- registration -----------------------------
 static const mp_rom_map_elem_t draw_locals_dict_table[] = {
-//        { MP_ROM_QSTR(MP_QSTR_fill), MP_ROM_PTR(&draw_fill_obj) },
+    { MP_ROM_QSTR(MP_QSTR_fill), MP_ROM_PTR(&draw_fill_obj) },
     { MP_ROM_QSTR(MP_QSTR_text), MP_ROM_PTR(&draw_text_obj) },
     { MP_ROM_QSTR(MP_QSTR_line), MP_ROM_PTR(&draw_line_obj) },
     { MP_ROM_QSTR(MP_QSTR_lines), MP_ROM_PTR(&draw_lines_obj) },
@@ -435,6 +533,7 @@ static const mp_rom_map_elem_t draw_locals_dict_table[] = {
     { MP_ROM_QSTR(MP_QSTR_circle), MP_ROM_PTR(&draw_circle_obj) },
     { MP_ROM_QSTR(MP_QSTR_ellipse), MP_ROM_PTR(&draw_ellipse_obj) },
     { MP_ROM_QSTR(MP_QSTR_polygon), MP_ROM_PTR(&draw_polygon_obj) },
+    { MP_ROM_QSTR(MP_QSTR_arrow), MP_ROM_PTR(&draw_arrow_obj) },
 };
 static MP_DEFINE_CONST_DICT(draw_locals_dict, draw_locals_dict_table);
 

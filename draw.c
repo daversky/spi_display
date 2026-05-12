@@ -158,36 +158,32 @@ static void plot_line(const mp_display_obj_t *self, int x1, int y1, int x2, int 
     }
 }
 // wrappers
-// draw.text(text="", (x,y), (r,g,b), 10)
-mp_obj_t draw_text_wrapper(size_t n_args, const mp_obj_t *args) {
-    draw_obj_t *self = MP_OBJ_TO_PTR(args[0]);
-    const char *text = mp_obj_str_get_str(args[1]);
-    int16_t x = mp_obj_get_int(args[2]);
-    int16_t y = mp_obj_get_int(args[3]);
-    // Обработка цвета (4-й аргумент)
-    uint16_t color = 0xFFFF;
-    if (n_args > 4) {
-        if (mp_obj_is_type(args[4], &mp_type_tuple)) {
-            // Цвет как кортеж (r,g,b)
-            mp_obj_t *items;
-            size_t len;
-            mp_obj_tuple_get(args[4], &len, &items);
-            if (len != 3) {
-                mp_raise_ValueError(MP_ERROR_TEXT("color tuple must have 3 elements (r,g,b)"));
-            }
-            int r = mp_obj_get_int(items[0]);
-            int g = mp_obj_get_int(items[1]);
-            int b = mp_obj_get_int(items[2]);
-            color = ((r >> 3) << 11) | ((g >> 2) << 5) | (b >> 3);
-        } else {
-            color = (uint16_t)mp_obj_get_int(args[4]);
-        }
-    }
-    int font_size = (n_args > 5) ? mp_obj_get_int(args[5]) : 0;
-    draw_text(self->display, text, x, y, color, font_size);
+
+// tft.draw.text(text="Hello World", start=(x,y), color=(r,g,b), font_size=n)
+mp_obj_t draw_text_wrapper(size_t n_args, const mp_obj_t *pos_args, mp_map_t *kw_args) {
+    enum { ARG_text, ARG_start, ARG_color, ARG_font_size };
+    static const mp_arg_t allowed_args[] = {
+            {MP_QSTR_text,      MP_ARG_REQUIRED | MP_ARG_OBJ, {.u_obj = MP_OBJ_NULL}},
+            {MP_QSTR_start,     MP_ARG_REQUIRED | MP_ARG_OBJ, {.u_obj = MP_OBJ_NULL}},
+            {MP_QSTR_color,     MP_ARG_REQUIRED | MP_ARG_OBJ, {.u_obj = MP_OBJ_NULL}},
+            {MP_QSTR_font_size, MP_ARG_REQUIRED | MP_ARG_INT, {.u_int = 6} },
+    };
+    mp_arg_val_t args[MP_ARRAY_SIZE(allowed_args)];
+    mp_arg_parse_all(n_args - 1, pos_args + 1, kw_args, MP_ARRAY_SIZE(allowed_args), allowed_args, args);
+    draw_obj_t *draw_ptr = MP_OBJ_TO_PTR(pos_args[0]);
+    mp_display_obj_t *display = draw_ptr->display;
+
+    const char *text = mp_obj_str_get_str(args[ARG_text].u_obj);
+    int x, y;
+    PARSE_COORD(args[ARG_start].u_obj, x, y);
+    const uint16_t color = convert_color(args[ARG_color].u_obj);
+    const int font_size = args[ARG_font_size].u_int;
+
+    draw_text(display, text, x, y, color, font_size);
+
     return mp_const_none;
 }
-MP_DEFINE_CONST_FUN_OBJ_VAR_BETWEEN(draw_text_obj, 4, 6, draw_text_wrapper);
+MP_DEFINE_CONST_FUN_OBJ_KW(draw_text_obj, 1, draw_text_wrapper);
 
 // draw.line(color=(r,g,b), start=(x,y), end=(x,y))
 mp_obj_t draw_line_wrapper(size_t n_args, const mp_obj_t *pos_args, mp_map_t *kw_args) {
